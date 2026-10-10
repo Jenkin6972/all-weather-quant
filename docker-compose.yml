@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  mootdx:
+    build: .
+    container_name: mootdx-app
+    volumes:
+      # 持久化配置数据
+      - mootdx-config:/root/.mootdx
+      # 挂载本地数据目录（可选）
+      - ./data:/app/data
+      # 挂载示例脚本目录
+      - ./sample:/app/sample
+      # 挂载所有本地脚本文件到容器（推荐方式）
+      # 这样你在本机修改的任何 .py 文件都会实时同步到容器
+      - .:/app/workspace
+      # 挂载通达信数据目录（重要！）
+      # 请根据你的实际通达信安装路径修改 D:/通达信
+      - D:/通达信:/app/tdx_data
+      # 挂载demo文件
+      - ./demo_offline_reader.py:/app/demo_offline_reader.py
+      - ./simple_demo.py:/app/simple_demo.py
+      - ./run_demo_docker.py:/app/run_demo_docker.py
+      - ./run_demos.sh:/app/run_demos.sh
+      - ./README_DEMO.md:/app/README_DEMO.md
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+      # 设置通达信数据目录环境变量
+      - TDX_DIR=/app/tdx_data
+    working_dir: /app
+    # 保持容器运行
+    command: tail -f /dev/null
+    restart: unless-stopped
+
+  # Demo运行服务 - 一次性运行demo
+  demo:
+    build: .
+    container_name: mootdx-demo
+    volumes:
+      - mootdx-config:/root/.mootdx
+      - ./demo_offline_reader.py:/app/demo_offline_reader.py
+      - ./simple_demo.py:/app/simple_demo.py
+      - ./run_demo_docker.py:/app/run_demo_docker.py
+      - ./run_demos.sh:/app/run_demos.sh
+      - ./README_DEMO.md:/app/README_DEMO.md
+      # 输出目录
+      - ./output:/app/output
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PYTHONDONTWRITEBYTECODE=1
+    working_dir: /app
+    command: python3 run_demo_docker.py
+    profiles: ["demo"]  # 使用profile控制，需要手动启动
+
+  # 可选：添加Jupyter Notebook服务用于交互式开发
+  jupyter:
+    build: .
+    container_name: mootdx-jupyter
+    ports:
+      - "8888:8888"
+    volumes:
+      - mootdx-config:/root/.mootdx
+      - ./notebooks:/app/notebooks
+      - ./sample:/app/sample
+      - ./demo_offline_reader.py:/app/demo_offline_reader.py
+      - ./simple_demo.py:/app/simple_demo.py
+      - ./run_demo_docker.py:/app/run_demo_docker.py
+      - ./README_DEMO.md:/app/README_DEMO.md
+    environment:
+      - PYTHONUNBUFFERED=1
+    working_dir: /app
+    command: >
+      bash -c "pip install jupyter matplotlib &&
+               jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --allow-root --NotebookApp.token='' --NotebookApp.password=''"
+    restart: unless-stopped
+    profiles: ["jupyter"]  # 使用profile控制
+
+volumes:
+  mootdx-config:
+    driver: local
